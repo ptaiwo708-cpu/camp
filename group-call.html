@@ -18,38 +18,51 @@
 html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body {
   background: var(--bg); color: var(--text); font-family: 'Satoshi', -apple-system, sans-serif;
-  display: flex; flex-direction: column; height: 100dvh;
+  height: 100dvh; overflow: hidden;
 }
 button { font-family: inherit; }
 
+/* The call lives in the same 480px column as every other Camplugie screen,
+   so it doesn't blow up to full width on a laptop. */
+.gc-frame {
+  position: fixed; inset: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px; height: 100dvh;
+  display: flex; flex-direction: column; background: var(--bg);
+}
+@media (min-width: 720px) {
+  .gc-frame { border-left: 1px solid var(--border); border-right: 1px solid var(--border); }
+}
+
 /* ---- header ---- */
 .gc-header {
-  display: flex; align-items: center; gap: 10px;
-  padding: calc(var(--safe-top) + 12px) 16px 10px; z-index: 5; flex-shrink: 0;
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(var(--safe-top) + 8px) 12px 6px; z-index: 5; flex-shrink: 0;
 }
 .gc-header .tx { flex: 1; min-width: 0; }
-.gc-header b { font-size: 15.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gc-header span { display: block; font-size: 11.5px; color: var(--text3); }
-.gc-badge { background: var(--brand-soft); color: var(--brand); font-size: 11px; font-weight: 800; padding: 5px 11px; border-radius: 999px; flex-shrink: 0; }
+.gc-header b { font-size: 14px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gc-header span { display: block; font-size: 10.5px; color: var(--text3); }
+.gc-badge { background: var(--brand-soft); color: var(--brand); font-size: 10px; font-weight: 800; padding: 4px 9px; border-radius: 999px; flex-shrink: 0; }
 .gc-badge.live { background: rgba(251,113,133,.16); color: var(--danger); }
 
 /* ---- stage ---- */
-.gc-stage { flex: 1; min-height: 0; padding: 0 10px; display: flex; flex-direction: column; gap: 8px; }
+.gc-stage { flex: 1; min-height: 0; padding: 0 8px; display: flex; flex-direction: column; gap: 6px; }
 
 /* General mode: responsive mesh grid */
-.gc-grid { flex: 1; min-height: 0; display: grid; gap: 6px; grid-template-columns: repeat(var(--cols, 2), 1fr); align-content: start; overflow-y: auto; }
+.gc-grid { flex: 1; min-height: 0; display: grid; gap: 5px; grid-template-columns: repeat(var(--cols, 2), 1fr); align-content: start; overflow-y: auto; }
 .gc-tile {
-  position: relative; background: var(--surface2); border-radius: 14px; overflow: hidden;
-  aspect-ratio: 3/4; display: flex; align-items: center; justify-content: center;
+  position: relative; background: var(--surface2); border-radius: 12px; overflow: hidden;
+  aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center;
 }
+/* One or two people get taller tiles; a crowd gets square ones. */
+.gc-grid[style*="--cols: 1"] .gc-tile { aspect-ratio: 3/4; }
 .gc-tile video { width: 100%; height: 100%; object-fit: cover; }
 .gc-tile.no-video video { display: none; }
 .gc-tile.speaking { outline: 2px solid var(--money); }
 .gc-tile.offline { opacity: .4; }
 .gc-avatar {
-  width: 56px; height: 56px; border-radius: 50%;
+  width: clamp(38px, 13vw, 52px); height: clamp(38px, 13vw, 52px); border-radius: 50%;
   background: linear-gradient(135deg, var(--brand), var(--brand-dark));
-  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px;
+  display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;
 }
 .gc-tile .gc-name {
   position: absolute; left: 8px; right: 8px; bottom: 8px; font-size: 12px; font-weight: 700;
@@ -66,23 +79,24 @@ button { font-family: inherit; }
   position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
 }
 .gc-lecture-stage video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-.gc-lecture-stage .gc-avatar { width: 88px; height: 88px; font-size: 28px; }
+.gc-lecture-stage .gc-avatar { width: clamp(56px, 20vw, 80px); height: clamp(56px, 20vw, 80px); font-size: 22px; }
 .gc-stage-label {
-  position: absolute; left: 10px; bottom: 10px; background: rgba(0,0,0,.5); backdrop-filter: blur(6px);
-  padding: 5px 11px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  position: absolute; left: 8px; bottom: 8px; right: 8px; background: rgba(0,0,0,.5); backdrop-filter: blur(6px);
+  padding: 5px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.gc-hint { text-align: center; font-size: 11.5px; color: var(--text3); padding: 2px 6px; }
+.gc-hint { text-align: center; font-size: 11px; color: var(--text3); padding: 1px 6px; line-height: 1.3; }
 .gc-hint b { color: var(--accent); }
 
 .gc-student-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px; scrollbar-width: none; flex-shrink: 0; }
 .gc-student-strip::-webkit-scrollbar { display: none; }
 .gc-student-tile {
-  position: relative; flex-shrink: 0; width: 80px; height: 98px; border-radius: 12px; background: var(--surface2);
+  position: relative; flex-shrink: 0; width: 62px; height: 74px; border-radius: 10px; background: var(--surface2);
   display: flex; align-items: center; justify-content: center; border: 2px solid transparent; cursor: pointer; overflow: hidden;
 }
 .gc-student-tile.onstage { border-color: var(--accent); }
 .gc-student-tile.hand { border-color: var(--money); }
-.gc-student-tile .gc-avatar { width: 40px; height: 40px; font-size: 14px; }
+.gc-student-tile .gc-avatar { width: 30px; height: 30px; font-size: 11px; }
 .gc-student-tile .gc-name {
   position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; font-size: 9.5px; font-weight: 700;
   padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px #000;
@@ -92,20 +106,29 @@ button { font-family: inherit; }
 
 /* ---- controls ---- */
 .gc-controls {
-  display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap;
-  padding: 14px 16px calc(var(--safe-bottom) + 14px); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  gap: clamp(8px, 3vw, 16px);
+  padding: 10px 10px calc(var(--safe-bottom) + 20px); flex-shrink: 0;
 }
 .gc-ctl {
-  width: 54px; height: 54px; border-radius: 50%; border: none; background: var(--surface2); color: #fff;
+  width: clamp(40px, 12vw, 50px); height: clamp(40px, 12vw, 50px);
+  border-radius: 50%; border: none; background: var(--surface2); color: #fff;
   display: flex; align-items: center; justify-content: center; cursor: pointer; position: relative; transition: transform .12s;
+  flex-shrink: 0;
 }
 .gc-ctl:active { transform: scale(.92); }
-.gc-ctl svg { width: 22px; height: 22px; }
+.gc-ctl svg { width: clamp(17px, 5.2vw, 21px); height: clamp(17px, 5.2vw, 21px); }
 .gc-ctl.off { background: #fff; color: var(--brand-dark); }
 .gc-ctl.on { background: var(--accent); color: #1A1200; }
 .gc-ctl.end { background: var(--danger); }
 .gc-ctl[disabled] { opacity: .38; cursor: not-allowed; }
-.gc-ctl .lbl { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font-size: 9.5px; color: var(--text3); font-weight: 700; white-space: nowrap; }
+.gc-ctl .lbl { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%); font-size: 9px; color: var(--text3); font-weight: 700; white-space: nowrap; }
+/* Short phones: drop the labels rather than eating the video area. */
+@media (max-height: 620px) {
+  .gc-ctl .lbl { display: none; }
+  .gc-controls { padding-bottom: calc(var(--safe-bottom) + 10px); }
+  .gc-student-tile { width: 54px; height: 64px; }
+}
 
 /* ---- participants sheet ---- */
 .gc-sheet-bd { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; display: none; align-items: flex-end; justify-content: center; }
@@ -137,6 +160,8 @@ button { font-family: inherit; }
 </style>
 </head>
 <body>
+
+<div class="gc-frame">
 
 <div class="gc-header">
   <div class="tx">
@@ -192,6 +217,8 @@ button { font-family: inherit; }
     <span class="lbl" id="endLbl">Leave</span>
   </button>
 </div>
+
+</div><!-- /.gc-frame -->
 
 <div class="gc-sheet-bd" id="gcSheet"><div class="gc-sheet" id="gcSheetBody"></div></div>
 <div class="gc-toast" id="gcToast"></div>
