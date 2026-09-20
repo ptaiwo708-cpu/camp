@@ -1445,6 +1445,52 @@ mark.hit { background: var(--accent); color: #1A1200; border-radius: 3px; paddin
 .call-mode-sheet-backdrop .msg-sheet button small { display: block; font-size: 11.5px; color: var(--text3); font-weight: 500; }
 .call-mode-sheet-backdrop .msg-sheet button > span.col { display: flex; flex-direction: column; gap: 2px; }
 
+/* ---- Add people / invite picker ---- */
+.gi-addpeople {
+  width: 100%; display: flex; align-items: center; gap: 12px; margin: 2px 0 10px;
+  background: none; border: none; color: var(--text); font: inherit; font-size: 14.5px;
+  padding: 11px 2px; cursor: pointer; text-align: left;
+}
+.gi-addpeople .ic {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--brand); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; flex-shrink: 0;
+}
+.gi-addpeople .tx b { display: block; font-weight: 700; }
+.gi-addpeople .tx span { display: block; font-size: 12px; color: var(--text3); }
+
+.pp-search { padding: 10px 14px 6px; flex-shrink: 0; }
+.pp-search input {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 999px;
+  padding: 12px 16px; font: inherit; font-size: 14.5px; color: var(--text); outline: none;
+}
+.pp-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 14px calc(20px + var(--safe-bottom)); }
+.pp-row { display: flex; align-items: center; gap: 11px; padding: 10px 2px; }
+.pp-row .av {
+  width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
+  background: var(--surface3); color: var(--text2);
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800;
+}
+.pp-row .av img { width: 100%; height: 100%; object-fit: cover; }
+.pp-row .tx { flex: 1; min-width: 0; }
+.pp-row .tx b { display: block; font-size: 14.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-row .tx span { display: block; font-size: 12px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pp-btn {
+  flex-shrink: 0; border: 1px solid var(--brand); background: none; color: var(--brand);
+  border-radius: 999px; padding: 7px 14px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer;
+}
+.pp-btn.solid { background: var(--brand); color: #fff; }
+.pp-btn.plug { border-color: var(--accent); color: var(--accent); margin-right: 6px; }
+.pp-btn.plug.done { border-color: var(--border); color: var(--text3); }
+.pp-btn[disabled] { opacity: .5; cursor: default; }
+.pp-empty { text-align: center; color: var(--text3); font-size: 13.5px; padding: 26px 10px; }
+.pp-invite {
+  display: flex; align-items: center; gap: 11px; padding: 12px 2px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.pp-invite .ic { width: 42px; height: 42px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.pp-invite b { display: block; font-size: 14.5px; }
+.pp-invite span { display: block; font-size: 12px; color: var(--text3); }
+
 /* ---- Forward picker ---- */
 .fw-list { max-height: 46vh; overflow-y: auto; }
 </style>
@@ -1617,10 +1663,10 @@ mark.hit { background: var(--accent); color: #1A1200; border-radius: 3px; paddin
 
       <div class="gi-section">
         <h3 id="giMembersTitle">Members</h3>
-        <div class="gi-add" id="giAddWrap" style="display:none">
-          <input id="giAddInput" placeholder="Add by username…" autocomplete="off">
-          <button id="giAddBtn">Add</button>
-        </div>
+        <button class="gi-addpeople" id="giAddPeopleBtn" style="display:none">
+          <span class="ic">+</span>
+          <span class="tx"><b>Add people</b><span>Search anyone on Camplugie</span></span>
+        </button>
         <div id="giMembers"></div>
       </div>
 
@@ -1629,6 +1675,25 @@ mark.hit { background: var(--accent); color: #1A1200; border-radius: 3px; paddin
         <div class="gi-row gi-danger" id="giDeleteBtn" style="display:none"><span style="width:40px;text-align:center">🗑️</span><div class="tx"><b>Delete group</b></div></div>
       </div>
     </div>
+  </section>
+
+  <!-- ===== Add people / invite picker ===== -->
+  <section class="gi-panel" id="peoplePanel" aria-hidden="true">
+    <header class="chat-top">
+      <button class="icon-btn" id="ppBackBtn" aria-label="Back">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div style="flex:1;padding-left:4px;min-width:0">
+        <b style="font-size:16px">Add people</b>
+        <div class="thread-substatus" id="ppSub">Tap Add to put someone in this group</div>
+      </div>
+    </header>
+
+    <div class="pp-search">
+      <input id="ppSearch" type="search" placeholder="Search by name or @username…" autocomplete="off">
+    </div>
+
+    <div class="pp-list" id="ppList"></div>
   </section>
 
 </div>
@@ -2721,7 +2786,7 @@ function renderInfoPanel() {
   $('giDesc').textContent = group.description || '';
   $('giMembersTitle').textContent = `${members.length} member${members.length === 1 ? '' : 's'}`;
   $('giEditBtn').style.display = isAdmin ? 'flex' : 'none';
-  $('giAddWrap').style.display = isAdmin ? 'flex' : 'none';
+  $('giAddPeopleBtn').style.display = 'flex';
   $('giDeleteBtn').style.display = isOwner ? 'flex' : 'none';
   $('giSettingsSection').style.display = (isAdmin && !OFF.has('only_admins_can_post')) ? 'block' : 'none';
   $('giOnlyAdmins').classList.toggle('on', !!group.only_admins_can_post);
@@ -2730,15 +2795,15 @@ function renderInfoPanel() {
 
   // members, admins first
   const sorted = [...members].sort((a, b) => {
-    const rank = r => r === 'owner' ? 0 : r === 'admin' ? 1 : 2;
+    const rank = r => ['creator', 'owner'].includes(r) ? 0 : ['admin', 'moderator'].includes(r) ? 1 : 2;
     return rank(a.role) - rank(b.role) ||
       (a.profile?.full_name || '').localeCompare(b.profile?.full_name || '');
   });
   $('giMembers').innerHTML = sorted.map(m => {
     const nm = m.profile?.full_name || m.profile?.username || 'Member';
     const av = m.profile?.avatar_url ? `<img src="${esc(m.profile.avatar_url)}" alt="">` : esc(window.CP.initials(nm));
-    const tag = m.role === 'owner' ? '<span class="gi-tag owner">Owner</span>'
-      : m.role === 'admin' ? '<span class="gi-tag">Admin</span>' : '';
+    const tag = ['creator', 'owner'].includes(m.role) ? '<span class="gi-tag owner">Creator</span>'
+      : ['admin', 'moderator'].includes(m.role) ? '<span class="gi-tag">Admin</span>' : '';
     return `<div class="gi-row" data-member="${esc(m.user_id)}">
       <span class="av">${av}</span>
       <span class="tx"><b>${esc(nm)}${m.user_id === myUserId ? ' (You)' : ''}</b>
@@ -2768,7 +2833,7 @@ $('giMembers').addEventListener('click', (e) => {
   const nm = mem.profile?.full_name || mem.profile?.username || 'Member';
 
   const sheet = makeSheet('memberSheet');
-  const canManage = isAdmin && mem.role !== 'owner';
+  const canManage = isAdmin && !['creator', 'owner'].includes(mem.role);
   sheet.querySelector('.msg-sheet').innerHTML = `
     <div class="grab"></div>
     <h4>${esc(nm)}</h4>
@@ -2791,11 +2856,16 @@ $('giMembers').addEventListener('click', (e) => {
       return;
     }
     if (btn.dataset.m === 'role') {
-      const nextRole = mem.role === 'admin' ? 'member' : 'admin';
+      const nextRole = ['admin', 'moderator'].includes(mem.role) ? 'member' : 'admin';
       const { error } = await window.sb.from('group_members')
         .update({ role: nextRole }).eq('group_id', groupId).eq('user_id', uid);
       if (error) { alert("Couldn't change that member's role."); return; }
       mem.role = nextRole;
+      if (!OFF.has('can_add_members')) {
+        window.sb.from('group_members')
+          .update({ can_add_members: nextRole === 'admin', can_remove_members: nextRole === 'admin' })
+          .eq('group_id', groupId).eq('user_id', uid).then(() => {}, () => {});
+      }
       postSystem(`${nm} is ${nextRole === 'admin' ? 'now an admin' : 'no longer an admin'}`);
       renderInfoPanel();
       return;
@@ -2813,27 +2883,174 @@ $('giMembers').addEventListener('click', (e) => {
   };
 });
 
-/* ---- add member ---- */
-$('giAddBtn').addEventListener('click', addMember);
-$('giAddInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') addMember(); });
+/* ============================================================
+   ADD PEOPLE  (search everyone on Camplugie, add or plug them)
+   ============================================================ */
 
-async function addMember() {
-  const handle = $('giAddInput').value.trim().replace(/^@/, '');
-  if (!handle) return;
-  const { data: found, error } = await window.sb.from('profiles')
-    .select('id, full_name, username, avatar_url').ilike('username', handle).limit(1).maybeSingle();
-  if (error || !found) { alert(`No one found with the username "${handle}".`); return; }
-  if (memberMap.has(found.id)) { alert('They\'re already in this group.'); return; }
+const people = $('peoplePanel');
+let ppRows = [];
+let myPlugs = new Set();
 
-  const { error: insErr } = await window.sb.from('group_members')
-    .insert({ group_id: groupId, user_id: found.id, role: 'member' });
-  if (insErr) { alert("Couldn't add them — check the group's permissions."); return; }
+function openPeople() {
+  people.classList.add('show');
+  people.setAttribute('aria-hidden', 'false');
+  $('ppSub').textContent = isAdmin
+    ? 'Tap Add to put someone in this group'
+    : 'Only admins can add people — you can still plug them';
+  $('ppSearch').value = '';
+  loadPlugs();
+  searchPeople('');
+  setTimeout(() => $('ppSearch').focus(), 250);
+}
+function closePeople() { people.classList.remove('show'); people.setAttribute('aria-hidden', 'true'); }
 
-  const nm = found.full_name || found.username;
+$('giAddPeopleBtn').addEventListener('click', openPeople);
+$('ppBackBtn').addEventListener('click', closePeople);
+$('giInviteBtn').addEventListener('click', openPeople);
+
+// Who I've already plugged, so the button reads right.
+async function loadPlugs() {
+  if (OFF.has('plugs')) return;
+  const { data, error } = await window.sb.from('plugs')
+    .select('user_id, plug_id').or(`user_id.eq.${myUserId},plug_id.eq.${myUserId}`);
+  if (error) { OFF.add('plugs'); return; }
+  myPlugs = new Set((data || []).map(r => r.user_id === myUserId ? r.plug_id : r.user_id));
+}
+
+let ppTimer = null;
+$('ppSearch').addEventListener('input', () => {
+  clearTimeout(ppTimer);
+  ppTimer = setTimeout(() => searchPeople($('ppSearch').value.trim()), 260);
+});
+
+async function searchPeople(q) {
+  const list = $('ppList');
+  list.innerHTML = `<div class="pp-empty">Searching…</div>`;
+
+  const sel = 'id, full_name, username, avatar_url, is_verified, university_id, universities(name)';
+  let query = window.sb.from('profiles').select(sel).neq('id', myUserId).limit(40);
+
+  if (q) {
+    const term = q.replace(/^@/, '').replace(/[%,]/g, '');
+    query = query.or(`username.ilike.%${term}%,full_name.ilike.%${term}%`);
+  } else if (window.CP_PROFILE?.university_id) {
+    // No search text yet → show people from my own campus first.
+    query = query.eq('university_id', window.CP_PROFILE.university_id);
+  }
+
+  let { data, error } = await query;
+  if (error) {
+    // 'universities(name)' may not join on every setup — retry plain.
+    ({ data, error } = await window.sb.from('profiles')
+      .select('id, full_name, username, avatar_url, is_verified')
+      .neq('id', myUserId).limit(40));
+  }
+  if (error) { list.innerHTML = `<div class="pp-empty">Couldn't load people right now.</div>`; return; }
+
+  ppRows = (data || []).filter(p => !p.is_banned);
+  renderPeople(q);
+}
+
+function renderPeople(q) {
+  const list = $('ppList');
+  const invite = `<div class="pp-invite" id="ppInviteRow">
+      <span class="ic">🔗</span>
+      <span style="flex:1;min-width:0"><b>Share invite link</b><span>Anyone with the link can join</span></span>
+    </div>`;
+
+  if (!ppRows.length) {
+    list.innerHTML = invite + `<div class="pp-empty">${q ? `No one found for "${esc(q)}".` : 'No one to show yet.'}</div>`;
+    wireInviteRow();
+    return;
+  }
+
+  list.innerHTML = invite + ppRows.map(p => {
+    const nm = p.full_name || p.username || 'Camplugie user';
+    const av = p.avatar_url
+      ? `<span class="av"><img src="${esc(p.avatar_url)}" alt=""></span>`
+      : `<span class="av">${esc(window.CP.initials(nm))}</span>`;
+    const inGroup = memberMap.has(p.id);
+    const plugged = myPlugs.has(p.id);
+    const sub = [p.username ? '@' + p.username : '', p.universities?.name || ''].filter(Boolean).join(' · ');
+
+    return `<div class="pp-row" data-uid="${esc(p.id)}">
+      ${av}
+      <span class="tx"><b>${esc(nm)}${p.is_verified ? ' ✅' : ''}</b><span>${esc(sub)}</span></span>
+      <button class="pp-btn plug${plugged ? ' done' : ''}" data-plug="${esc(p.id)}"${plugged ? ' disabled' : ''}>${plugged ? 'Plugged' : 'Plug'}</button>
+      ${inGroup
+        ? `<button class="pp-btn" disabled>In group</button>`
+        : isAdmin ? `<button class="pp-btn solid" data-add="${esc(p.id)}">Add</button>` : ''}
+    </div>`;
+  }).join('');
+
+  wireInviteRow();
+}
+
+function wireInviteRow() {
+  const row = $('ppInviteRow');
+  if (row) row.addEventListener('click', shareInvite);
+}
+
+async function shareInvite() {
+  const link = group?.invite_code
+    ? `${location.origin}/groups.html?join=${group.invite_code}`
+    : `${location.origin}/group-thread.html?id=${groupId}`;
+  const text = `Join "${group?.name || 'our group'}" on Camplugie: ${link}`;
+  if (navigator.share) { try { await navigator.share({ title: group?.name, text, url: link }); return; } catch (_) {} }
+  try { await navigator.clipboard.writeText(text); alert(group?.invite_code ? `Invite link copied.\n\nInvite code: ${group.invite_code}` : 'Invite link copied.'); }
+  catch (_) { prompt('Copy this invite link:', link); }
+}
+
+$('ppList').addEventListener('click', async (e) => {
+  const addBtn = e.target.closest('[data-add]');
+  const plugBtn = e.target.closest('[data-plug]');
+
+  if (addBtn) {
+    const uid = addBtn.dataset.add;
+    const p = ppRows.find(x => x.id === uid);
+    addBtn.disabled = true; addBtn.textContent = 'Adding…';
+    const ok = await addMember(uid, p?.full_name || p?.username || 'Someone');
+    if (ok) { addBtn.classList.remove('solid'); addBtn.textContent = 'In group'; }
+    else { addBtn.disabled = false; addBtn.textContent = 'Add'; }
+    return;
+  }
+
+  if (plugBtn) {
+    const uid = plugBtn.dataset.plug;
+    plugBtn.disabled = true; plugBtn.textContent = 'Plugging…';
+    const { error } = await window.sb.from('plugs').insert({ user_id: myUserId, plug_id: uid });
+    // A duplicate just means we're already plugged — treat it as success.
+    if (error && !/duplicate|unique/i.test(error.message || '')) {
+      plugBtn.disabled = false; plugBtn.textContent = 'Plug';
+      alert("Couldn't plug them right now.");
+      return;
+    }
+    myPlugs.add(uid);
+    plugBtn.classList.add('done'); plugBtn.textContent = 'Plugged';
+  }
+});
+
+async function addMember(uid, nm) {
+  if (!isAdmin) { alert('Only group admins can add people.'); return false; }
+  if (memberMap.has(uid)) return true;
+
+  let payload = { group_id: groupId, user_id: uid, role: 'member', can_send_messages: true };
+  let { error } = await window.sb.from('group_members').insert(payload);
+  if (error && optional(error, 'can_send_messages')) {
+    ({ error } = await window.sb.from('group_members')
+      .insert({ group_id: groupId, user_id: uid, role: 'member' }));
+  }
+  if (error) {
+    console.error('Add member error:', error);
+    alert("Couldn't add them — check this group's permissions in Supabase.");
+    return false;
+  }
+
   postSystem(`${nm} was added to the group`);
-  $('giAddInput').value = '';
   await loadMembers();
+  window.sb.from('groups').update({ member_count: members.length }).eq('id', groupId).then(() => {}, () => {});
   renderInfoPanel(); render();
+  return true;
 }
 
 /* ---- mute / settings / leave / delete ---- */
@@ -2871,22 +3088,14 @@ $('giEditBtn').addEventListener('click', async () => {
   renderInfoPanel();
 });
 
-$('giInviteBtn').addEventListener('click', async () => {
-  const link = group?.invite_code
-    ? `${location.origin}/groups.html?join=${group.invite_code}`
-    : `${location.origin}/group-thread.html?id=${groupId}`;
-  const text = `Join "${group?.name || 'our group'}" on Camplugie: ${link}`;
-  if (navigator.share) { try { await navigator.share({ title: group?.name, text, url: link }); return; } catch (_) {} }
-  try { await navigator.clipboard.writeText(text); alert('Invite link copied.'); }
-  catch (_) { prompt('Copy this invite link:', link); }
-});
-
 $('giLeaveBtn').addEventListener('click', async () => {
   if (!confirm('Exit this group? You\'ll stop getting its messages.')) return;
   await postSystem(`${myName} left the group`);
   const { error } = await window.sb.from('group_members')
     .delete().eq('group_id', groupId).eq('user_id', myUserId);
   if (error) { alert("Couldn't leave the group."); return; }
+  window.sb.from('groups').update({ member_count: Math.max(1, members.length - 1) })
+    .eq('id', groupId).then(() => {}, () => {});
   window.location.href = 'groups.html';
 });
 
@@ -2911,7 +3120,7 @@ function applyGroupSettings() {
    ============================================================ */
 
 async function loadMembers() {
-  let sel = 'user_id, role, last_read_at, is_muted, profiles(id, full_name, username, avatar_url)';
+  let sel = 'user_id, role, last_read_at, is_muted, profiles(id, full_name, username, avatar_url, university_id)';
   let { data, error } = await window.sb.from('group_members').select(sel).eq('group_id', groupId);
 
   // Fall back through the optional columns if this DB doesn't have them yet.
@@ -2919,7 +3128,7 @@ async function loadMembers() {
     optional(error, 'last_read_at'); optional(error, 'is_muted');
     OFF.add('last_read_at'); OFF.add('is_muted');
     ({ data, error } = await window.sb.from('group_members')
-      .select('user_id, role, profiles(id, full_name, username, avatar_url)').eq('group_id', groupId));
+      .select('user_id, role, profiles(id, full_name, username, avatar_url, university_id)').eq('group_id', groupId));
   }
   if (error) { console.error('Members error:', error); return; }
 
@@ -2940,9 +3149,12 @@ function refreshMemberDerived() {
     memberNames[m.user_id] = m.profile?.full_name || m.profile?.username || 'Member';
   });
   const me = memberMap.get(myUserId);
-  isAdmin = !!me && ['admin', 'owner'].includes(me.role);
-  isOwner = (!!me && me.role === 'owner') || group?.created_by === myUserId;
-  if (group?.created_by === myUserId) isAdmin = true;
+  // This project stores the group creator as role 'creator' (groups.html) and
+  // also stamps groups.creator_id — accept every spelling so the person who
+  // made the group always gets the admin tools.
+  const creatorId = group?.creator_id || group?.created_by || group?.owner_id || null;
+  isOwner = (!!me && ['creator', 'owner'].includes(me.role)) || creatorId === myUserId;
+  isAdmin = isOwner || (!!me && ['admin', 'moderator'].includes(me.role));
   muted = !!me?.is_muted;
   buildMentionRegex();
   paintHeaderCount();
@@ -3107,7 +3319,8 @@ window.addEventListener('beforeunload', () => { presence?.stopTyping(myName); sa
 
 // Android back button / swipe-back closes the info panel and select mode first.
 window.addEventListener('popstate', () => {
-  if (panel.classList.contains('show')) { closeInfo(); history.pushState(null, ''); }
+  if (people.classList.contains('show')) { closePeople(); history.pushState(null, ''); }
+  else if (panel.classList.contains('show')) { closeInfo(); history.pushState(null, ''); }
   else if (selectMode) { exitSelectMode(); history.pushState(null, ''); }
 });
 history.pushState(null, '');
