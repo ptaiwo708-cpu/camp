@@ -48,13 +48,19 @@ button { font-family: inherit; }
 .gc-stage { flex: 1; min-height: 0; padding: 0 8px; display: flex; flex-direction: column; gap: 6px; }
 
 /* General mode: responsive mesh grid */
-.gc-grid { flex: 1; min-height: 0; display: grid; gap: 5px; grid-template-columns: repeat(var(--cols, 2), 1fr); align-content: start; overflow-y: auto; }
+/* Rows split whatever height is left, so the video area always fits the screen
+   exactly — no aspect-ratio forcing a tile taller than the phone. */
+.gc-grid {
+  flex: 1; min-height: 0; display: grid; gap: 5px;
+  grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: stretch; overflow: hidden;
+}
 .gc-tile {
   position: relative; background: var(--surface2); border-radius: 12px; overflow: hidden;
-  aspect-ratio: 1/1; display: flex; align-items: center; justify-content: center;
+  min-height: 0; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
 }
-/* One or two people get taller tiles; a crowd gets square ones. */
-.gc-grid[style*="--cols: 1"] .gc-tile { aspect-ratio: 3/4; }
 .gc-tile video { width: 100%; height: 100%; object-fit: cover; }
 .gc-tile.no-video video { display: none; }
 .gc-tile.speaking { outline: 2px solid var(--money); }
@@ -75,7 +81,7 @@ button { font-family: inherit; }
 /* Lecture mode */
 #gcLecture { flex: 1; min-height: 0; flex-direction: column; gap: 8px; }
 .gc-lecture-stage {
-  flex: 1; min-height: 0; background: var(--surface2); border-radius: 16px;
+  flex: 1; min-height: 0; background: #000; border-radius: 14px;
   position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
 }
 .gc-lecture-stage video { width: 100%; height: 100%; object-fit: contain; background: #000; }
@@ -717,7 +723,10 @@ function paintStrip() {
 function regridGeneral() {
   if (isLecture) return;
   const n = $('gcGrid').children.length;
-  $('gcGrid').style.setProperty('--cols', n <= 1 ? 1 : n <= 4 ? 2 : 3);
+  // Columns chosen so the rows that follow stay close to square in a 480px
+  // column — the grid itself splits the leftover height between them.
+  const cols = n <= 1 ? 1 : n <= 4 ? 2 : n <= 9 ? 3 : 4;
+  $('gcGrid').style.setProperty('--cols', cols);
 }
 
 function paintSubtitle() {
