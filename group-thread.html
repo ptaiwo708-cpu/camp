@@ -3070,8 +3070,9 @@ $('ppList').addEventListener('click', async (e) => {
     const { error } = await window.sb.from('plugs').insert({ user_id: myUserId, plug_id: uid });
     // A duplicate just means we're already plugged — treat it as success.
     if (error && !/duplicate|unique/i.test(error.message || '')) {
+      console.error('Plug insert failed:', error);
       plugBtn.disabled = false; plugBtn.textContent = 'Plug';
-      alert("Couldn't plug them right now.");
+      alert(`Couldn't plug them: ${error.message || 'unknown error'}\n\nThis usually means the plugs table needs the insert policy from camplugie-groups.sql.`);
       return;
     }
     myPlugs.add(uid);
@@ -3091,7 +3092,7 @@ async function addMember(uid, nm) {
   }
   if (error) {
     console.error('Add member error:', error);
-    alert("Couldn't add them — check this group's permissions in Supabase.");
+    alert(`Couldn't add them: ${error.message || 'unknown error'}\n\nThis usually means the group_members insert policy from camplugie-groups.sql is missing.`);
     return false;
   }
 
@@ -3138,7 +3139,10 @@ $('giEditBtn').addEventListener('click', async () => {
 });
 
 $('giLeaveBtn').addEventListener('click', async () => {
-  if (!confirm('Exit this group? You\'ll stop getting its messages.')) return;
+  const otherAdmins = members.some(m => m.user_id !== myUserId && ['creator', 'owner', 'admin', 'moderator'].includes(m.role));
+  if (isAdmin && !otherAdmins && members.length > 1) {
+    if (!confirm("You're the only admin here. If you leave, no one will be able to manage this group. Leave anyway?")) return;
+  } else if (!confirm('Exit this group? You\'ll stop getting its messages.')) return;
   await postSystem(`${myName} left the group`);
   const { error } = await window.sb.from('group_members')
     .delete().eq('group_id', groupId).eq('user_id', myUserId);
@@ -3223,6 +3227,19 @@ function paintHeaderCount() {
    BOOT
    ============================================================ */
 
+function toastBanner(msg) {
+  let el = document.getElementById('cpToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'cpToast';
+    el.style.cssText = 'position:fixed;left:50%;bottom:calc(90px + var(--safe-bottom));transform:translateX(-50%);max-width:88%;background:var(--surface3);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font-size:13px;line-height:1.4;color:var(--text);z-index:500;box-shadow:var(--shadow-lg)';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  clearTimeout(toastBanner._t);
+  toastBanner._t = setTimeout(() => el.remove(), 7000);
+}
+
 async function loadGroup(userId) {
   groupId = new URLSearchParams(window.location.search).get('id');
   if (!groupId) { box.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No group specified.</div>`; return; }
@@ -3241,10 +3258,17 @@ async function loadGroup(userId) {
   // invisible to my own group. Put the row back, then re-read.
   const creatorId = g.creator_id || g.created_by || g.owner_id || null;
   if (creatorId === userId && !memberMap.has(userId)) {
-    await window.sb.from('group_members')
-      .insert({ group_id: groupId, user_id: userId, role: 'creator', can_send_messages: true })
-      .then(() => {}, () => {});
-    await loadMembers();
+    const { error: healErr } = await window.sb.from('group_members')
+      .insert({ group_id: groupId, user_id: userId, role: 'creator', can_send_messages: true });
+    if (healErr) {
+      // Almost always a missing INSERT policy on group_members — see the
+      // gm_insert_self policy in camplugie-groups.sql. Surface it instead of
+      // silently leaving the creator locked out of their own group.
+      console.error('Could not restore your membership row:', healErr);
+      toastBanner("You created this group but its permissions won't let you back in as a member — ask whoever manages the database to run camplugie-groups.sql.");
+    } else {
+      await loadMembers();
+    }
   }
 
   applyGroupSettings();
