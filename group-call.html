@@ -347,9 +347,15 @@ document.addEventListener('cp-ready', async (e) => {
       : "You're muted. Raise your hand and the lecturer can call you up.";
     $('gcStudentStrip').style.display = isHost ? 'flex' : 'none';
     if (isStudent) { $('handBtn').style.display = 'flex'; $('camBtn').style.display = 'none'; }
-    if (isHost) $('shareBtn').style.display = 'flex';
+    // The host shares straight to the composited stage. A student who's been
+    // called up can share too — it rides their existing video line the same
+    // way their camera would, so the host just draws it instead of their face.
+    $('shareBtn').style.display = 'flex';
   } else {
+    // General call: anyone can share, since everyone already sends their own
+    // video track peer-to-peer — sharing is just swapping that track.
     $('gcGrid').style.display = 'grid';
+    $('shareBtn').style.display = 'flex';
   }
 
   try { iceServers = await window.CP_getIceServers(); }
@@ -1095,8 +1101,14 @@ async function toggleCam() {
 }
 
 async function toggleScreenShare() {
-  if (!isHost || !isLecture) return;
+  if (isLecture && isHost) return toggleScreenShareHost();
+  if (isLecture && isStudent) return toggleScreenShareOnStage();
+  if (!isLecture) return toggleScreenShareGeneral();
+}
 
+/* Host in a lecture: shares straight into the compositing canvas everyone
+   already receives — see setupHostPipeline() / drawFrame(). */
+async function toggleScreenShareHost() {
   if (screenStream) {
     screenStream.getTracks().forEach(t => t.stop());
     screenStream = null;
@@ -1123,6 +1135,74 @@ async function toggleScreenShare() {
 
   $('shareBtn').classList.add('on');
   toast('Sharing your screen with the class');
+}
+
+/* A student who's been called up: their video line to the host is already
+   open (that's how being "called up" works), so sharing is a plain
+   replaceTrack — the host draws whatever arrives on that line, camera or
+   screen, without knowing the difference. */
+async function toggleScreenShareOnStage() {
+  if (!onStage) { toast('The lecturer has to call you up before you can share.'); return; }
+
+  if (screenStream) {
+    const camTrack = localStream.getVideoTracks().find(t => t !== screenStream.getVideoTracks()[0]);
+    const sender = hostVideoSender();
+    if (sender) await sender.replaceTrack(camTrack || null).catch(() => {});
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+    $('shareBtn').classList.remove('on');
+    toast('Back to your camera');
+    return;
+  }
+
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+  } catch (err) { return; }
+
+  const screenTrack = screenStream.getVideoTracks()[0];
+  const sender = hostVideoSender();
+  if (sender) await sender.replaceTrack(screenTrack).catch(() => {});
+  else localStream.addTrack(screenTrack);
+
+  screenTrack.addEventListener('ended', toggleScreenShareOnStage);
+  $('shareBtn').classList.add('on');
+  toast('Sharing your screen with the class');
+}
+
+/* General call: full mesh, everyone already sends one live video track per
+   peer connection — sharing swaps that outgoing track for every peer at
+   once. No renegotiation, no new connections. */
+async function toggleScreenShareGeneral() {
+  if (screenStream) {
+    const camTrack = localStream.getVideoTracks()[0];
+    Object.values(peers).forEach(p => {
+      const sender = p.pc?.getSenders().find(s => s.track && s.track.kind === 'video');
+      if (sender && camTrack) sender.replaceTrack(camTrack).catch(() => {});
+    });
+    const selfVideo = document.querySelector('#tile-self video');
+    if (selfVideo && camTrack) selfVideo.srcObject = localStream;
+    screenStream.getTracks().forEach(t => t.stop());
+    screenStream = null;
+    $('shareBtn').classList.remove('on');
+    toast('Back to your camera');
+    return;
+  }
+
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+  } catch (err) { return; }
+
+  const screenTrack = screenStream.getVideoTracks()[0];
+  Object.values(peers).forEach(p => {
+    const sender = p.pc?.getSenders().find(s => s.track && s.track.kind === 'video');
+    if (sender) sender.replaceTrack(screenTrack).catch(() => {});
+  });
+  const selfVideo = document.querySelector('#tile-self video');
+  if (selfVideo) selfVideo.srcObject = screenStream;
+
+  screenTrack.addEventListener('ended', toggleScreenShareGeneral);
+  $('shareBtn').classList.add('on');
+  toast('Sharing your screen');
 }
 
 function toggleHand() {
