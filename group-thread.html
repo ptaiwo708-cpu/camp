@@ -985,6 +985,9 @@ body.chat-page { overflow: hidden; height: 100dvh; }
   display: flex; flex-direction: column;
   height: 100dvh;
   background: var(--bg-gradient), var(--bg);
+  /* The slide-in panels park at translateX(100%) when closed. Without this
+     they spill out of the frame and sit next to the chat on a wide screen. */
+  overflow: hidden;
 }
 
 /* ---- Header ---- */
@@ -1006,9 +1009,25 @@ body.chat-page { overflow: hidden; height: 100dvh; }
   overscroll-behavior: contain;
 }
 .thread-messages {
-  padding: 12px 12px 14px; display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 10px 14px; display: flex; flex-direction: column; gap: 2px;
   min-height: 100%;
-  background: radial-gradient(circle at 50% 0%, rgba(167,139,250,0.05), transparent 60%);
+  background:
+    radial-gradient(circle at 12% 8%, rgba(167,139,250,.07), transparent 42%),
+    radial-gradient(circle at 88% 62%, rgba(251,191,36,.05), transparent 40%);
+}
+
+/* Empty group: a card, not a stray line of grey text. */
+.chat-empty {
+  margin: auto; text-align: center; padding: 26px 22px; max-width: 300px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.chat-empty .em { font-size: 34px; display: block; margin-bottom: 10px; }
+.chat-empty b { display: block; font-size: 15.5px; margin-bottom: 5px; }
+.chat-empty span { display: block; font-size: 13px; color: var(--text3); line-height: 1.5; }
+.chat-empty button {
+  margin-top: 14px; background: var(--brand); color: #fff; border: none;
+  border-radius: 999px; padding: 10px 18px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer;
 }
 .chat-pinned { flex-shrink: 0; }
 
@@ -1017,7 +1036,7 @@ body.chat-page { overflow: hidden; height: 100dvh; }
 .msg-row.mine { justify-content: flex-end; }
 .msg-row.grouped { margin-top: 1px; }
 .msg-bubble {
-  max-width: 78%; padding: 6px 9px 5px; border-radius: 14px;
+  max-width: 82%; padding: 6px 9px 5px; border-radius: 14px;
   font-size: 14px; line-height: 1.38; position: relative;
   word-break: break-word; white-space: pre-wrap;
   box-shadow: 0 1px 1px rgba(0,0,0,.18);
@@ -1371,9 +1390,14 @@ mark.hit { background: var(--accent); color: #1A1200; border-radius: 3px; paddin
   position: absolute; inset: 0; z-index: 60;
   background: var(--bg-gradient), var(--bg);
   display: flex; flex-direction: column;
-  transform: translateX(100%); transition: transform .22s ease;
+  transform: translateX(100%);
+  visibility: hidden; pointer-events: none;
+  transition: transform .22s ease, visibility 0s linear .22s;
 }
-.gi-panel.show { transform: none; }
+.gi-panel.show {
+  transform: none; visibility: visible; pointer-events: auto;
+  transition: transform .22s ease, visibility 0s;
+}
 .gi-body { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: calc(26px + var(--safe-bottom)); }
 .gi-hero { text-align: center; padding: 22px 18px 14px; }
 .gi-hero .av {
@@ -1408,6 +1432,7 @@ mark.hit { background: var(--accent); color: #1A1200; border-radius: 3px; paddin
 .gi-row .tx span { display: block; font-size: 12px; color: var(--text3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gi-tag { font-size: 10.5px; font-weight: 800; padding: 3px 8px; border-radius: 999px; background: var(--brand-soft); color: var(--brand); flex-shrink: 0; }
 .gi-tag.owner { background: var(--accent-soft); color: var(--accent); }
+.gi-tag.lecturer { background: rgba(52,211,153,.16); color: var(--money); }
 .gi-danger { color: var(--danger); font-weight: 700; }
 
 .gi-media { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; }
@@ -1921,7 +1946,7 @@ const esc = C.esc;
 /* ---------- state ---------- */
 let myUserId = null, myName = 'Someone', myAvatar = null;
 let groupId = null, group = null;
-let isAdmin = false, isOwner = false;
+let isAdmin = false, isOwner = false, canLecture = false;
 let members = [];
 const memberMap = new Map();
 let memberNames = {};
@@ -2030,7 +2055,14 @@ function mentionsMe(m) {
 
 function render() {
   if (!messages.length) {
-    box.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text3);font-size:13px;">No messages yet — say hi to the group 👋</div>`;
+    box.innerHTML = `<div class="chat-empty">
+        <span class="em">👋</span>
+        <b>${esc(group?.name || 'This group')} is ready</b>
+        <span>No messages yet. Say hi, or bring your coursemates in.</span>
+        ${isAdmin ? '<button id="emptyAddBtn">Add people</button>' : ''}
+      </div>`;
+    const b = document.getElementById('emptyAddBtn');
+    if (b) b.addEventListener('click', openPeople);
     return;
   }
   computeReceipts();
@@ -2803,7 +2835,8 @@ function renderInfoPanel() {
     const nm = m.profile?.full_name || m.profile?.username || 'Member';
     const av = m.profile?.avatar_url ? `<img src="${esc(m.profile.avatar_url)}" alt="">` : esc(window.CP.initials(nm));
     const tag = ['creator', 'owner'].includes(m.role) ? '<span class="gi-tag owner">Creator</span>'
-      : ['admin', 'moderator'].includes(m.role) ? '<span class="gi-tag">Admin</span>' : '';
+      : ['admin', 'moderator'].includes(m.role) ? '<span class="gi-tag">Admin</span>'
+      : (m.can_lecture || m.role === 'lecturer') ? '<span class="gi-tag lecturer">Lecturer</span>' : '';
     return `<div class="gi-row" data-member="${esc(m.user_id)}">
       <span class="av">${av}</span>
       <span class="tx"><b>${esc(nm)}${m.user_id === myUserId ? ' (You)' : ''}</b>
@@ -2839,7 +2872,8 @@ $('giMembers').addEventListener('click', (e) => {
     <h4>${esc(nm)}</h4>
     <button data-m="view">👤 View profile</button>
     <button data-m="dm">💬 Message privately</button>
-    ${canManage ? `<button data-m="role">${mem.role === 'admin' ? '⬇️ Dismiss as admin' : '⬆️ Make group admin'}</button>` : ''}
+    ${canManage ? `<button data-m="role">${['admin', 'moderator'].includes(mem.role) ? '⬇️ Dismiss as admin' : '⬆️ Make group admin'}</button>` : ''}
+    ${canManage ? `<button data-m="lecture">${(mem.can_lecture || mem.role === 'lecturer') ? '🚫 Remove lecture access' : '🎓 Allow them to lecture'}</button>` : ''}
     ${canManage ? `<button data-m="remove" class="danger">🚫 Remove from group</button>` : ''}
     <button data-act="close">✕ Cancel</button>`;
   sheet.classList.add('show');
@@ -2870,6 +2904,21 @@ $('giMembers').addEventListener('click', (e) => {
       renderInfoPanel();
       return;
     }
+    if (btn.dataset.m === 'lecture') {
+      const next = !(mem.can_lecture || mem.role === 'lecturer');
+      const { error } = await window.sb.from('group_members')
+        .update({ can_lecture: next }).eq('group_id', groupId).eq('user_id', uid);
+      if (optional(error, 'can_lecture')) {
+        alert('Lecture rights need the can_lecture column — run camplugie-groups.sql in Supabase.');
+        return;
+      }
+      if (error) { alert("Couldn't change their lecture access."); return; }
+      mem.can_lecture = next;
+      postSystem(next ? `${nm} can now start lectures in this group` : `${nm} can no longer start lectures`);
+      renderInfoPanel();
+      return;
+    }
+
     if (btn.dataset.m === 'remove') {
       if (!confirm(`Remove ${nm} from the group?`)) return;
       const { error } = await window.sb.from('group_members')
@@ -3120,13 +3169,13 @@ function applyGroupSettings() {
    ============================================================ */
 
 async function loadMembers() {
-  let sel = 'user_id, role, last_read_at, is_muted, profiles(id, full_name, username, avatar_url, university_id)';
+  let sel = 'user_id, role, last_read_at, is_muted, can_lecture, profiles(id, full_name, username, avatar_url, university_id)';
   let { data, error } = await window.sb.from('group_members').select(sel).eq('group_id', groupId);
 
   // Fall back through the optional columns if this DB doesn't have them yet.
   if (error) {
-    optional(error, 'last_read_at'); optional(error, 'is_muted');
-    OFF.add('last_read_at'); OFF.add('is_muted');
+    optional(error, 'last_read_at'); optional(error, 'is_muted'); optional(error, 'can_lecture');
+    OFF.add('last_read_at'); OFF.add('is_muted'); OFF.add('can_lecture');
     ({ data, error } = await window.sb.from('group_members')
       .select('user_id, role, profiles(id, full_name, username, avatar_url, university_id)').eq('group_id', groupId));
   }
@@ -3137,6 +3186,7 @@ async function loadMembers() {
     role: r.role || 'member',
     last_read_at: r.last_read_at || null,
     is_muted: !!r.is_muted,
+    can_lecture: !!r.can_lecture,
     profile: r.profiles || null,
   }));
   refreshMemberDerived();
@@ -3155,6 +3205,9 @@ function refreshMemberDerived() {
   const creatorId = group?.creator_id || group?.created_by || group?.owner_id || null;
   isOwner = (!!me && ['creator', 'owner'].includes(me.role)) || creatorId === myUserId;
   isAdmin = isOwner || (!!me && ['admin', 'moderator'].includes(me.role));
+  // A course rep (admin) can hand lecture rights to a lecturer without making
+  // them an admin — they get the podium, not the member list.
+  canLecture = isAdmin || !!me?.can_lecture || me?.role === 'lecturer';
   muted = !!me?.is_muted;
   buildMentionRegex();
   paintHeaderCount();
@@ -3182,6 +3235,18 @@ async function loadGroup(userId) {
   $('groupAvatar').innerHTML = g.avatar_url ? `<img src="${esc(g.avatar_url)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">` : window.CP.initials(g.name);
 
   await loadMembers();
+
+  // If I created this group but my group_members row never landed (the upsert
+  // in groups.html can fail silently behind RLS), the admin tools would be
+  // invisible to my own group. Put the row back, then re-read.
+  const creatorId = g.creator_id || g.created_by || g.owner_id || null;
+  if (creatorId === userId && !memberMap.has(userId)) {
+    await window.sb.from('group_members')
+      .insert({ group_id: groupId, user_id: userId, role: 'creator', can_send_messages: true })
+      .then(() => {}, () => {});
+    await loadMembers();
+  }
+
   applyGroupSettings();
   loadDraft();
 
@@ -3244,8 +3309,8 @@ function openCallSheet() {
     <div class="grab"></div>
     <h4>Start a call</h4>
     <button data-mode="general"><span class="em">📞</span><span class="col"><b>General call</b><small>Everyone can talk and turn on video</small></span></button>
-    ${isAdmin ? `<button data-mode="lecture"><span class="em">🎓</span><span class="col"><b>Start a lecture</b><small>You're on video, students listen — call any student up</small></span></button>`
-              : `<div style="padding:10px 22px;color:var(--text3);font-size:12.5px">Only group admins can start a lecture.</div>`}
+    ${canLecture ? `<button data-mode="lecture"><span class="em">🎓</span><span class="col"><b>Start a lecture</b><small>You're on video, students listen — call any student up</small></span></button>`
+              : `<div style="padding:10px 22px;color:var(--text3);font-size:12.5px">An admin has to give you lecture access first.</div>`}
     <button data-act="close">✕ Cancel</button>`;
   sheet.classList.add('show');
 
@@ -3258,7 +3323,7 @@ function openCallSheet() {
 }
 
 async function startGroupCall(mode) {
-  if (mode === 'lecture' && !isAdmin) { alert('Only group admins can start a lecture.'); return; }
+  if (mode === 'lecture' && !canLecture) { alert('An admin has to give you lecture access first.'); return; }
   const { data: call, error } = await window.sb.from('group_calls')
     .insert({ group_id: groupId, host_id: myUserId, mode }).select().single();
   if (error) { console.error('Could not start call:', error); alert("Couldn't start the call — try again."); return; }
